@@ -12,7 +12,7 @@ void setup() {
 // write your initialization code here
     Serial.begin(9600);
 
-    qtr.setTypeRC();
+    qtr.setTypeRC(); // her kunne man også ha brukt setTypeAnalog() men RC (Resistor-Capacitor) skal visst være raskere
     qtr.setSensorPins((const uint8_t[]){3, 4, 5, 6, 7, 8}, sensor_count); // bruk disse pinsene på arduinoen
     qtr.setEmitterPin(2);
 
