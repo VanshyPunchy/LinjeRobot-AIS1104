@@ -1,8 +1,58 @@
 #include <Arduino.h>
+#include <QTRSensors.h> // kan være denne ikke funker ordentlig
+
+// koden er tatt fra QTRSensors sin eksempeloppgave
+
+QTRSensors qtr;
+
+const uint8_t sensor_count = 6;
+uint16_t sensor_values[sensor_count];
 
 void setup() {
 // write your initialization code here
     Serial.begin(9600);
+
+    qtr.setTypeRC();
+    qtr.setSensorPins((const uint8_t[]){3, 4, 5, 6, 7, 8}, sensor_count); // bruk disse pinsene på arduinoen
+    qtr.setEmitterPin(2);
+
+
+    delay(500);
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH); // turn on Arduino's LED to indicate we are in calibration mode
+
+    Serial.println("Starter QTRs Sensor-kalibrering.");
+    // analogRead() takes about 0.1 ms on an AVR.
+    // 0.1 ms per sensor * 4 samples per sensor read (default) * 6 sensors
+    // * 10 reads per calibrate() call = ~24 ms per calibrate() call.
+    // Call calibrate() 400 times to make calibration take about 10 seconds.
+    for (uint16_t i = 0; i < 400; i++)
+    {
+        Serial.println(i);
+        qtr.calibrate();
+    }
+
+    Serial.println("Ferdig med kalibrering.");
+    digitalWrite(LED_BUILTIN, LOW); // signalisere at vi er ferdig å kalibrere
+
+    // print the calibration minimum values measured when emitters were on
+    Serial.begin(9600);
+    for (uint8_t i = 0; i < sensor_count; i++)
+    {
+        Serial.print(qtr.calibrationOn.minimum[i]);
+        Serial.print(' ');
+    }
+    Serial.println();
+
+    // print the calibration maximum values measured when emitters were on
+    for (uint8_t i = 0; i < sensor_count; i++)
+    {
+        Serial.print(qtr.calibrationOn.maximum[i]);
+        Serial.print(' ');
+    }
+    Serial.println();
+    Serial.println();
+    delay(1000);
 }
 
 void loop() {
