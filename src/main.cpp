@@ -55,9 +55,9 @@ QTRSensors qtr;
 const uint8_t sensor_count = 6;
 uint16_t sensor_values[sensor_count];
 
-Motor leftMotor(9,10,11);
-Motor rightMotor(5,6,7);
-MotorDriver driver(8, leftMotor, rightMotor);
+Motor leftMotor(10,8,9);
+Motor rightMotor(11,12,13);
+MotorDriver driver(7, leftMotor, rightMotor);
 
 
 //PID
@@ -67,7 +67,7 @@ float Kd = 0.2;
 
 int lastError = 0;
 int integral = 0;
-const int baseSpeed = 100;
+const int baseSpeed = 50;
 
 void setup() {
 // write your initialization code here
@@ -91,6 +91,7 @@ void setup() {
     {
         Serial.println(i);
         qtr.calibrate();
+        delay(5);
     }
 
     Serial.println("Ferdig med kalibrering.");
@@ -113,9 +114,8 @@ void setup() {
     }
     Serial.println();
     Serial.println();
-    delay(1000);
+    delay(5000);
 }
-const int baseSpeed = 100;
 
 void loop() {
 // write your code here
@@ -143,7 +143,7 @@ void loop() {
     }
     Serial.println(position);
 
-    delay(250);
+    delay(100);
 
     int leftSpeed = baseSpeed + corrcection;
     int rightSpeed = baseSpeed - corrcection;
