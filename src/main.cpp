@@ -59,6 +59,16 @@ Motor leftMotor(9,10,11);
 Motor rightMotor(5,6,7);
 MotorDriver driver(8, leftMotor, rightMotor);
 
+
+//PID
+float Kp = 0.15;
+float Ki = 0.0;
+float Kd = 0.2;
+
+int lastError = 0;
+int integral = 0;
+const int baseSpeed = 100;
+
 void setup() {
 // write your initialization code here
     Serial.begin(9600);
@@ -113,6 +123,16 @@ void loop() {
     // from 0 to 5000 (for a white line, use readLineWhite() instead)
     uint16_t position = qtr.readLineBlack(sensor_values);
 
+    //Beregn error fra midten (2500)
+    int error = position - 2500;
+
+    //Pid kalkulasjon
+    integral += error;
+    int derivative = error - lastError;
+    int corrcection = Kp * error + Ki * integral + Kd * derivative;
+    lastError = error;
+
+
     // print the sensor values as numbers from 0 to 1000, where 0 means maximum
     // reflectance and 1000 means minimum reflectance, followed by the line
     // position
@@ -125,8 +145,8 @@ void loop() {
 
     delay(250);
 
-    int leftSpeed = baseSpeed;
-    int rightSpeed = baseSpeed;
+    int leftSpeed = baseSpeed + corrcection;
+    int rightSpeed = baseSpeed - corrcection;
 
     leftSpeed = constrain(leftSpeed, 0, 255);
     rightSpeed = constrain(rightSpeed, 0, 255);
