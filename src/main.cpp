@@ -59,10 +59,27 @@ Motor leftMotor(10,8,9);
 Motor rightMotor(11,12,13);
 MotorDriver driver(7, leftMotor, rightMotor);
 
+/* Instruks for bruk og endring av PID
+ * Problem | Løsning
+ * For mye svinging | Reduser Kp
+ * Treg linjefølging | Øk Kp
+ * Oscillerer | Øk Kd
+ * Aldri helt på linjen | Øk Ki
+ * /
 
-//PID
+
+/*PID
+* P reagerer på nåværende feil (Større feil desto større korrkeksjon)
+* P = Kp * error
+*/
 float Kp = 0.05;
+/* Husker tidligere feil over tid, fikser små vedvarende feil som P ikke klarer
+ * I = Ki * integral
+ */
 float Ki = 0.0;
+/*D Reagerer på hvor raskt feilen endrer seg og forutsier fremtidig feil
+ *D = Kd * (error - forrige_error)
+ */
 float Kd = 0.0;
 
 int lastError = 0;
