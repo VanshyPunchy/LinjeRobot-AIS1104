@@ -61,13 +61,13 @@ MotorDriver driver(7, leftMotor, rightMotor);
 
 
 //PID
-float Kp = 0.15;
+float Kp = 0.05;
 float Ki = 0.0;
-float Kd = 0.2;
+float Kd = 0.0;
 
 int lastError = 0;
 int integral = 0;
-const int baseSpeed = 50;
+const int baseSpeed = 80;
 
 void setup() {
 // write your initialization code here
