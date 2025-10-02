@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <QTRSensors.h>
+#include <vector>
 
 QTRSensors qtr;
 
