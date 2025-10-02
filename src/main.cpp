@@ -145,7 +145,7 @@ void loop() {
     int error = position - 2500;
 
     //Pid kalkulasjon
-    integral = constrain(-1000,1000);
+    integral = constrain(integral,-1000,1000);
     integral += error;
     int derivative = error - lastError;
     int correction = Kp * error + Ki * integral + Kd * derivative;
