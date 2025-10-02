@@ -39,7 +39,9 @@ class MotorDriver {
 
 public:
     //Member initializer list, kopierer to motor objekter in til dette MotorDriver objektet
-    MotorDriver(int stbyPin, Motor l,Motor r) : stbyPin(stbyPin), leftMotor(l), rightMotor(r) {
+    MotorDriver(int stbyPin, const Motor& l,const Motor& r)
+    : stbyPin(stbyPin), leftMotor(l), rightMotor(r)
+    {
         pinMode(stbyPin, OUTPUT);
         digitalWrite(stbyPin, HIGH); //Skru på driver
     }
@@ -65,7 +67,7 @@ MotorDriver driver(7, leftMotor, rightMotor);
  * Treg linjefølging | Øk Kp
  * Oscillerer | Øk Kd
  * Aldri helt på linjen | Øk Ki
- * /
+ */
 
 
 /*PID
@@ -84,7 +86,7 @@ float Kd = 0.0;
 
 int lastError = 0;
 int integral = 0;
-const int baseSpeed = 80;
+const int baseSpeed = 100;
 
 void setup() {
 // write your initialization code here
@@ -115,7 +117,6 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW); // signalisere at vi er ferdig å kalibrere
 
     // print the calibration minimum values measured when emitters were on
-    Serial.begin(9600);
     for (uint8_t i = 0; i < sensor_count; i++)
     {
         Serial.print(qtr.calibrationOn.minimum[i]);
@@ -144,9 +145,10 @@ void loop() {
     int error = position - 2500;
 
     //Pid kalkulasjon
+    integral = constrain(-1000,1000);
     integral += error;
     int derivative = error - lastError;
-    int corrcection = Kp * error + Ki * integral + Kd * derivative;
+    int correction = Kp * error + Ki * integral + Kd * derivative;
     lastError = error;
 
 
@@ -160,15 +162,15 @@ void loop() {
     }
     Serial.println(position);
 
-    delay(100);
+    delay(10);
 
-    int leftSpeed = baseSpeed + corrcection;
-    int rightSpeed = baseSpeed - corrcection;
+    int leftSpeed = baseSpeed + correction;
+    int rightSpeed = baseSpeed - correction;
 
     leftSpeed = constrain(leftSpeed, 0, 255);
     rightSpeed = constrain(rightSpeed, 0, 255);
 
-    driver.move(leftSpeed, rightSpeed);
+    driver.move(leftSpeed, -rightSpeed);
 
     delay(10);
 }
