@@ -1,195 +1,155 @@
 #include <Arduino.h>
-#include <QTRSensors.h> // kan være denne ikke funker ordentlig
+#include <QTRSensors.h>
+
+QTRSensors qtr;
 
 class Motor {
-    //Hver motor trenger 3 pins, in1 og in2 er fremover/bakover mens pwm kontroller fart
-    int pwmPin, in1, in2;
-
+    uint8_t pwmPin, in1, in2;
 public:
-    Motor(int pwmPin, int pin1, int pin2) : pwmPin(pwmPin), in1(pin1), in2(pin2) {
+    Motor(uint8_t pwmPin, uint8_t pin1, uint8_t pin2)
+        : pwmPin(pwmPin), in1(pin1), in2(pin2) {}
 
+    void begin() {
         pinMode(pwmPin, OUTPUT);
         pinMode(in1, OUTPUT);
         pinMode(in2, OUTPUT);
+        // start i "coast"
+        digitalWrite(in1, LOW);
+        digitalWrite(in2, LOW);
+        analogWrite(pwmPin, 0);
     }
-    //Spinner motoren i en fast hastighet
+
+    // speed: -255..255  (>=0 = fremover, <0 = bakover)
     void drive(int speed) {
-        //Hvis motor fart er større enn eller lik 0 spin framover
-        if (speed >= 0) {
-            //Setter motorfart høy
-            digitalWrite(in1, HIGH);
-            digitalWrite(in2, LOW);
-        }
-        else{
-            //Setter motorfart lav
+        bool forward = (speed >= 0);
+        int duty = forward ? speed : -speed;
+        if (duty > 255) duty = 255;
+
+        if (duty == 0) {
+            // Coast (TB6612FNG): IN1=LOW, IN2=LOW, PWM=0
             digitalWrite(in1, LOW);
-            digitalWrite(in2, HIGH);
-            // Slik at fart holder seg innenfor rekkevidden 0-255
-            speed = -speed;
+            digitalWrite(in2, LOW);
+            analogWrite(pwmPin, 0);
+            return;
         }
-        analogWrite(pwmPin, speed);
+
+        if (forward) { digitalWrite(in1, HIGH); digitalWrite(in2, LOW); }
+        else         { digitalWrite(in1, LOW);  digitalWrite(in2, HIGH); }
+
+        analogWrite(pwmPin, duty);
     }
 };
 
 class MotorDriver {
-    //standby Pin, MÅ være høy for at motorer skal kjøre
-    int stbyPin;
-    //To motor objekter fra motor klassen over
-    Motor leftMotor, rightMotor;
-
+    uint8_t stbyPin;
+    Motor &left, &right;
 public:
-    //Member initializer list, kopierer to motor objekter in til dette MotorDriver objektet
-    MotorDriver(int stbyPin, const Motor& l,const Motor& r)
-    : stbyPin(stbyPin), leftMotor(l), rightMotor(r)
-    {
+    MotorDriver(uint8_t stbyPin, Motor &l, Motor &r)
+        : stbyPin(stbyPin), left(l), right(r) {}
+
+    void begin() {
         pinMode(stbyPin, OUTPUT);
-        digitalWrite(stbyPin, HIGH); //Skru på driver
+        digitalWrite(stbyPin, HIGH); // enable driver
+        left.begin();
+        right.begin();
     }
+
     void move(int leftSpeed, int rightSpeed) {
-        leftMotor.drive(leftSpeed);
-        rightMotor.drive(rightSpeed);
+        left.drive(leftSpeed);
+        right.drive(rightSpeed);
+    }
+
+    void standby(bool enable) { // enable=true -> LOW (standby)
+        digitalWrite(stbyPin, enable ? LOW : HIGH);
     }
 };
-// koden er tatt fra QTRSensors sin eksempeloppgave
 
-QTRSensors qtr;
-
+// Konstanter
+const int16_t mid_sensor  = 2500; // 0..5000
+const int16_t base_speed  = 200;
 const uint8_t sensor_count = 6;
+
 uint16_t sensor_values[sensor_count];
+int8_t   binVals[sensor_count];   // 0/1 etter terskel
 
-Motor leftMotor(10,8,9);
-Motor rightMotor(11,12,13);
-MotorDriver driver(7, leftMotor, rightMotor);
-
-/* Instruks for bruk og endring av PID
- * Problem | Løsning
- * For mye svinging | Reduser Kp
- * Treg linjefølging | Øk Kp
- * Oscillerer | Øk Kd
- * Aldri helt på linjen | Øk Ki
- */
-
-
-/*PID
-* P reagerer på nåværende feil (Større feil desto større korrkeksjon)
-* P = Kp * error
-*/
-float Kp = 0.05;
-/* Husker tidligere feil over tid, fikser små vedvarende feil som P ikke klarer
- * I = Ki * integral
- */
-float Ki = 0.0;
-/*D Reagerer på hvor raskt feilen endrer seg og forutsier fremtidig feil
- *D = Kd * (error - forrige_error)
- */
-float Kd = 0.0;
-
-int lastError = 0;
-int integral = 0;
-const int baseSpeed = 100;
+// TB6612FNG til Arduino-pins
+Motor leftMotor(10, 9, 8);     // PWMA=10, AIN1=9, AIN2=8
+Motor rightMotor(11, 12, 13);  // PWMB=11, BIN1=12, BIN2=13
+MotorDriver driver(7, leftMotor, rightMotor); // STBY=7
 
 void setup() {
-// write your initialization code here
     Serial.begin(9600);
+    driver.begin();
 
-    qtr.setTypeRC(); // her kunne man også ha brukt setTypeAnalog() men RC (Resistor-Capacitor) skal visst være raskere
-    qtr.setSensorPins((const uint8_t[]){A0, A1, A2, A3, A4, A5}, sensor_count); // bruk disse pinsene på arduinoen
+    qtr.setTypeRC();
+    qtr.setSensorPins((const uint8_t[]){A0, A1, A2, A3, A4, A5}, sensor_count);
     qtr.setEmitterPin(2);
-
+    qtr.setTimeout(2500);
+    qtr.setSamplesPerSensor(4);
 
     delay(500);
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH); // turn on Arduino's LED to indicate we are in calibration mode
+    digitalWrite(LED_BUILTIN, HIGH);
 
-    Serial.println("Starter QTRs Sensor-kalibrering.");
-    // analogRead() takes about 0.1 ms on an AVR.
-    // 0.1 ms per sensor * 4 samples per sensor read (default) * 6 sensors
-    // * 10 reads per calibrate() call = ~24 ms per calibrate() call.
-    // Call calibrate() 400 times to make calibration take about 10 seconds.
-    for (uint16_t i = 0; i < 400; i++)
-    {
-        Serial.println(i);
-        qtr.calibrate();
+    Serial.println("Starter QTR-sensor-kalibrering.");
+    for (uint16_t i = 0; i < 400; i++) {
+        qtr.calibrate(); // flytt sensoren over lys/mørk
+        digitalWrite(LED_BUILTIN, (i & 1) ? HIGH : LOW);
         delay(5);
     }
-
     Serial.println("Ferdig med kalibrering.");
-    digitalWrite(LED_BUILTIN, LOW); // signalisere at vi er ferdig å kalibrere
+    digitalWrite(LED_BUILTIN, LOW);
 
-    // print the calibration minimum values measured when emitters were on
-    for (uint8_t i = 0; i < sensor_count; i++)
-    {
-        Serial.print(qtr.calibrationOn.minimum[i]);
-        Serial.print(' ');
+    // Skriv ut min/max (emitters på)
+    for (uint8_t i = 0; i < sensor_count; i++) {
+        Serial.print(qtr.calibrationOn.minimum[i]); Serial.print(' ');
     }
     Serial.println();
-
-    // print the calibration maximum values measured when emitters were on
-    for (uint8_t i = 0; i < sensor_count; i++)
-    {
-        Serial.print(qtr.calibrationOn.maximum[i]);
-        Serial.print(' ');
+    for (uint8_t i = 0; i < sensor_count; i++) {
+        Serial.print(qtr.calibrationOn.maximum[i]); Serial.print(' ');
     }
-    Serial.println();
-    Serial.println();
-    delay(5000);
+    Serial.println(); Serial.println();
+    delay(500);
 }
 
 void loop() {
-// write your code here
-    // read calibrated sensor values and obtain a measure of the line position
-    // from 0 to 5000 (for a white line, use readLineWhite() instead)
+    // Leser posisjon for svart linje på lys bakgrunn (0..5000)
     uint16_t position = qtr.readLineBlack(sensor_values);
 
-    //Beregn error fra midten (2500)
-    int error = position - 2500;
-
-    //Pid kalkulasjon
-    integral = constrain(-1000,1000);
-    integral += error;
-    int derivative = error - lastError;
-    int correction = Kp * error + Ki * integral + Kd * derivative;
-    lastError = error;
-
-
-    // print the sensor values as numbers from 0 to 1000, where 0 means maximum
-    // reflectance and 1000 means minimum reflectance, followed by the line
-    // position
-    for (uint8_t i = 0; i < sensor_count; i++)
-    {
-        Serial.print(sensor_values[i]);
-        Serial.print('\t');
+    // Lag 0/1 fra kalibrerte verdier (0..1000)
+    for (uint8_t i = 0; i < sensor_count; i++) {
+        binVals[i] = (sensor_values[i] > 675) ? 1 : 0;
     }
-    Serial.println(position);
 
-    delay(10);
+    // Enkel følge-logikk basert på midtsensorene
+    if (binVals[2] == 1 && binVals[3] == 1 && binVals[1] == 0 && binVals[4] == 0) {
+        driver.move(base_speed, base_speed); // rett fram
+    }
+    else if (binVals[2] == 1 && binVals[3] == 0) {
+        driver.move(base_speed, base_speed - 30); // litt høyre
+    }
+    else if (binVals[2] == 0 && binVals[3] == 1) {
+        driver.move(base_speed - 30, base_speed); // litt venstre
+    }
+    else if ( (binVals[1] == 1 || binVals[0] == 1) && (binVals[4] == 0 && binVals[5] == 0) ) {
+        driver.move(base_speed - 50, base_speed + 50); // sterk venstre
+    }
+    else if ( (binVals[4] == 1 || binVals[5] == 1) && (binVals[0] == 0 && binVals[1] == 0) ) {
+        driver.move(base_speed + 50, base_speed - 50); // sterk høyre
+    }
+    else {
+        // Linje mistet: stopp kort, rygg litt, og prøv igjen
+        driver.move(0, 0);
+        delay(80);
+        driver.move(-80, -80);
+        delay(120);
+    }
 
-    int leftSpeed = baseSpeed + correction;
-    int rightSpeed = baseSpeed - correction;
+    // Debug-utskrift
+    for (uint8_t i = 0; i < sensor_count; i++) {
+        Serial.print(sensor_values[i]); Serial.print('\t');
+    }
+    Serial.print("pos="); Serial.println(position);
 
-    leftSpeed = constrain(leftSpeed, 0, 255);
-    rightSpeed = constrain(rightSpeed, 0, 255);
-
-    driver.move(leftSpeed, -rightSpeed);
-
-    delay(10);
+    delay(30);
 }
-
-/*
- *      Forventet output:
- *      Starter QTRs Sensor-kalibrering.
- *      1
- *      2
- *      3
- *      ...
- *      399
- *      Ferdig med kalibrering.
- *
- *      392 456 429 489 389 289         // Dette tallet vil vi skal være lavt (det er laveste målingene
- *                                      // under kalibreringen
- *      2450 2500 2500 2500 2500 2499   // dette ønsker vi skal være på så nærme 2500 som mulig (høyeste
- *                                      // målingene under kalibreringen)
- *      0 0 0 0 0 0 0
- *      800 90 0 0 0 0 300 <----- de 6 første verdiene er hver sensor sin data (over svar linje betyr høy verdi)
- *      0 0 102 708 302 80 2000 <--- den 7 verdien er posisjonen verdi (hvor den svarte linjen er på sensoren)
- */
