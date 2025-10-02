@@ -73,7 +73,7 @@ const int16_t base_speed = 200;
 const uint8_t sensor_count = 6;
 uint16_t sensor_values[sensor_count];
 
-Motor leftMotor(10, 9, 8);  // pwmPin, in1, in2
+Motor leftMotor(10, 8, 9);  // pwmPin, in1, in2
 Motor rightMotor(11, 12, 13); // pwmPin, in1, in2
 MotorDriver driver(7, leftMotor, rightMotor);
 
