@@ -74,7 +74,7 @@ uint16_t sensor_values[sensor_count];
 int8_t   binVals[sensor_count];   // 0/1 etter terskel
 
 // TB6612FNG til Arduino-pins
-Motor leftMotor(10, 9, 8);     // PWMA=10, AIN1=9, AIN2=8
+Motor leftMotor(10, 8, 9);     // PWMA=10, AIN1=8, AIN2=9
 Motor rightMotor(11, 12, 13);  // PWMB=11, BIN1=12, BIN2=13
 MotorDriver driver(7, leftMotor, rightMotor); // STBY=7
 
