@@ -13,7 +13,7 @@ public:
         pinMode(pwmPin, OUTPUT);
         pinMode(in1, OUTPUT);
         pinMode(in2, OUTPUT);
-        // start i "coast"
+        // start i “coast”
         digitalWrite(in1, LOW);
         digitalWrite(in2, LOW);
         analogWrite(pwmPin, 0);
@@ -26,7 +26,7 @@ public:
         if (duty > 255) duty = 255;
 
         if (duty == 0) {
-            // Coast (TB6612FNG): IN1=LOW, IN2=LOW, PWM=0
+            // Coast: PWM=0 uansett retning på TB6612FNG
             digitalWrite(in1, LOW);
             digitalWrite(in2, LOW);
             analogWrite(pwmPin, 0);
@@ -42,7 +42,7 @@ public:
 
 class MotorDriver {
     uint8_t stbyPin;
-    Motor &left, &right;
+    Motor &left, &right;   // legg merke til referanser (ingen kopiering)
 public:
     MotorDriver(uint8_t stbyPin, Motor &l, Motor &r)
         : stbyPin(stbyPin), left(l), right(r) {}
@@ -59,30 +59,30 @@ public:
         right.drive(rightSpeed);
     }
 
-    void standby(bool enable) { // enable=true -> LOW (standby)
+    void standby(bool enable) {
         digitalWrite(stbyPin, enable ? LOW : HIGH);
     }
 };
 
-// Konstanter
-const int16_t mid_sensor  = 2500; // 0..5000
-const int16_t base_speed  = 200;
+
+const int16_t mid_sensor = 2500;   // 0..5000 => midten 2500
+const int16_t dead_zone = 600;   // død sone rundt midten
+const int16_t base_speed = 200;
+
+
 const uint8_t sensor_count = 6;
-
 uint16_t sensor_values[sensor_count];
-int8_t   binVals[sensor_count];   // 0/1 etter terskel
 
-// TB6612FNG til Arduino-pins
-Motor leftMotor(10, 9, 8);     // PWMA=10, AIN1=9, AIN2=8
-Motor rightMotor(11, 12, 13);  // PWMB=11, BIN1=12, BIN2=13
-MotorDriver driver(7, leftMotor, rightMotor); // STBY=7
+Motor leftMotor(10, 9, 8);  // pwmPin, in1, in2
+Motor rightMotor(11, 12, 13); // pwmPin, in1, in2
+MotorDriver driver(7, leftMotor, rightMotor);
 
 void setup() {
     Serial.begin(9600);
     driver.begin();
 
-    qtr.setTypeRC();
-    qtr.setSensorPins((const uint8_t[]){A0, A1, A2, A3, A4, A5}, sensor_count);
+    qtr.setTypeRC();                              // RC-varianten
+    qtr.setSensorPins((const uint8_t[]){A0,A1,A2,A3,A4,A5}, sensor_count);
     qtr.setEmitterPin(2);
     qtr.setTimeout(2500);
     qtr.setSamplesPerSensor(4);
@@ -93,8 +93,9 @@ void setup() {
 
     Serial.println("Starter QTR-sensor-kalibrering.");
     for (uint16_t i = 0; i < 400; i++) {
-        qtr.calibrate(); // flytt sensoren over lys/mørk
-        digitalWrite(LED_BUILTIN, (i & 1) ? HIGH : LOW);
+        qtr.calibrate();    // flytt sensoren over lys/mørk
+        Serial.println(i);
+        digitalWrite(LED_BUILTIN, LOW);
         delay(5);
     }
     Serial.println("Ferdig med kalibrering.");
@@ -109,47 +110,28 @@ void setup() {
         Serial.print(qtr.calibrationOn.maximum[i]); Serial.print(' ');
     }
     Serial.println(); Serial.println();
-    delay(500);
+    delay(1000);
 }
 
 void loop() {
-    // Leser posisjon for svart linje på lys bakgrunn (0..5000)
-    uint16_t position = qtr.readLineBlack(sensor_values);
+    // For svart linje på lys bakgrunn:
+    uint16_t position = qtr.readLineBlack(sensor_values); // fyller sensor_values kalibrert 0–1000
+    int16_t error = (int16_t)position - mid_sensor;
 
-    // Lag 0/1 fra kalibrerte verdier (0..1000)
-    for (uint8_t i = 0; i < sensor_count; i++) {
-        binVals[i] = (sensor_values[i] > 675) ? 1 : 0;
-    }
-
-    // Enkel følge-logikk basert på midtsensorene
-    if (binVals[2] == 1 && binVals[3] == 1 && binVals[1] == 0 && binVals[4] == 0) {
-        driver.move(base_speed, base_speed); // rett fram
-    }
-    else if (binVals[2] == 1 && binVals[3] == 0) {
-        driver.move(base_speed, base_speed - 30); // litt høyre
-    }
-    else if (binVals[2] == 0 && binVals[3] == 1) {
-        driver.move(base_speed - 30, base_speed); // litt venstre
-    }
-    else if ( (binVals[1] == 1 || binVals[0] == 1) && (binVals[4] == 0 && binVals[5] == 0) ) {
-        driver.move(base_speed - 50, base_speed + 50); // sterk venstre
-    }
-    else if ( (binVals[4] == 1 || binVals[5] == 1) && (binVals[0] == 0 && binVals[1] == 0) ) {
-        driver.move(base_speed + 50, base_speed - 50); // sterk høyre
-    }
-    else {
-        // Linje mistet: stopp kort, rygg litt, og prøv igjen
-        driver.move(0, 0);
-        delay(80);
-        driver.move(-80, -80);
-        delay(120);
+    if (abs(error) <= dead_zone) {
+        driver.move(base_speed, base_speed);
+    } else if (error < 0) {
+        driver.move(base_speed - (base_speed * abs(error) / mid_sensor),
+                    base_speed + (base_speed * abs(error) / mid_sensor));
+    } else {
+        driver.move(base_speed + (base_speed * abs(error) / mid_sensor),
+                    base_speed - (base_speed * abs(error) / mid_sensor));
     }
 
-    // Debug-utskrift
     for (uint8_t i = 0; i < sensor_count; i++) {
         Serial.print(sensor_values[i]); Serial.print('\t');
     }
-    Serial.print("pos="); Serial.println(position);
+    Serial.println(position);
 
-    delay(30);
+    delay(50);
 }
