@@ -74,11 +74,11 @@ MotorDriver driver(7, leftMotor, rightMotor);
 * P reagerer på nåværende feil (Større feil desto større korrkeksjon)
 * P = Kp * error
 */
-float Kp = 0.05;
+float Kp = 0.01;
 /* Husker tidligere feil over tid, fikser små vedvarende feil som P ikke klarer
  * I = Ki * integral
  */
-float Ki = 0.0;
+float Ki = 0.001;
 /*D Reagerer på hvor raskt feilen endrer seg og forutsier fremtidig feil
  *D = Kd * (error - forrige_error)
  */
