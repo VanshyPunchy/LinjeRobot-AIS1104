@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <QTRSensors.h>
-#include <vector>
+// #include <vector>  // ikke brukt
 
 QTRSensors qtr;
 
@@ -65,32 +65,53 @@ public:
     }
 };
 
-// Konstanter
-const int16_t mid_sensor  = 2500; // 0..5000
-const int16_t base_speed  = 200;
-const uint8_t sensor_count = 6;
+// --- Konstanter og oppsett ---
+const uint8_t SENSOR_COUNT = 6;
+const int16_t CENTER       = 2500;   // QTR readLineBlack: 0..5000
+const int16_t BASE_SPEED   = 180;    // 0..255 (start lavt, øk når det funker)
+const int16_t DEAD_BAND    = 400;    // rett frem når |error| <= dette
+const int16_t MAX_PWM      = 255;
 
-uint16_t sensor_values[sensor_count];
-int8_t   binVals[sensor_count];   // 0/1 etter terskel
+// PD-tuning (start her; finjustér på banen)
+const float KP = 0.12f;   // proporsjonal
+const float KD = 0.75f;   // derivasjon (stabiliserer sving)
 
-// TB6612FNG til Arduino-pins
+uint16_t sensor_values[SENSOR_COUNT];
+
+// TB6612FNG til Arduino-pins (som du hadde)
 Motor leftMotor(10, 8, 9);     // PWMA=10, AIN1=8, AIN2=9
 Motor rightMotor(11, 12, 13);  // PWMB=11, BIN1=12, BIN2=13
 MotorDriver driver(7, leftMotor, rightMotor); // STBY=7
+
+// QTR-parametre
+const uint8_t QTR_PINS[SENSOR_COUNT] = {A0, A1, A2, A3, A4, A5};
+const uint8_t EMITTER_PIN = 2;
+const uint16_t QTR_TIMEOUT_US = 2500;
+const uint8_t QTR_SAMPLES = 4;
+
+// PD-tilstand
+int16_t lastError = 0;
+uint32_t lastMs = 0;
+
+// Hjelp: begrens og returner int
+static inline int16_t clampi(int32_t v, int16_t lo, int16_t hi) {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return (int16_t)v;
+}
 
 void setup() {
     Serial.begin(9600);
     driver.begin();
 
     qtr.setTypeRC();
-    qtr.setSensorPins((const uint8_t[]){A0, A1, A2, A3, A4, A5}, sensor_count);
-    qtr.setEmitterPin(2);
-    qtr.setTimeout(2500);
-    qtr.setSamplesPerSensor(4);
+    qtr.setSensorPins(QTR_PINS, SENSOR_COUNT);
+    qtr.setEmitterPin(EMITTER_PIN);
+    qtr.setTimeout(QTR_TIMEOUT_US);
+    qtr.setSamplesPerSensor(QTR_SAMPLES);
 
     delay(500);
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH);
 
     Serial.println("Starter QTR-sensor-kalibrering.");
     for (uint16_t i = 0; i < 400; i++) {
@@ -101,56 +122,70 @@ void setup() {
     Serial.println("Ferdig med kalibrering.");
     digitalWrite(LED_BUILTIN, LOW);
 
-    // Skriv ut min/max (emitters på)
-    for (uint8_t i = 0; i < sensor_count; i++) {
+    // (valgfritt) skriv min/max for å verifisere
+    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         Serial.print(qtr.calibrationOn.minimum[i]); Serial.print(' ');
     }
     Serial.println();
-    for (uint8_t i = 0; i < sensor_count; i++) {
+    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         Serial.print(qtr.calibrationOn.maximum[i]); Serial.print(' ');
     }
-    Serial.println(); Serial.println();
-    delay(500);
+    Serial.println("\nKlar.");
+
+    lastMs = millis();
 }
 
 void loop() {
-    // Leser posisjon for svart linje på lys bakgrunn (0..5000)
-    uint16_t position = qtr.readLineBlack(sensor_values);
+    // 1) Les posisjon (svart linje på lys bakgrunn)
+    uint16_t pos = qtr.readLineBlack(sensor_values); // 0..5000
+    int16_t error = CENTER - (int16_t)pos;           // -2500..+2500
 
-    // Lag 0/1 fra kalibrerte verdier (0..1000)
-    for (uint8_t i = 0; i < sensor_count; i++) {
-        binVals[i] = (sensor_values[i] > 675) ? 1 : 0;
+    // 2) Enkel heuristikk for "linje mistet" (svak refleks over hele linja)
+    //    Sjekk høyeste kalibrerte sensorverdi; veldig lav => sannsynlig tapt
+    uint16_t maxVal = 0;
+    for (uint8_t i = 0; i < SENSOR_COUNT; i++) if (sensor_values[i] > maxVal) maxVal = sensor_values[i];
+
+    // 3) Beregn tidssteg for D-ledd
+    uint32_t now = millis();
+    float dt = (now - lastMs) / 1000.0f;
+    if (dt <= 0) dt = 0.001f; // unngå div 0
+
+    // 4) PD-korreksjon
+    float derr = (error - lastError) / dt;      // endring per sekund
+    float correctionF = KP * error + KD * derr;
+
+    // Begrens korreksjonen slik at differensialen ikke saturerer fullstendig
+    int16_t correction = clampi((int32_t)correctionF, -255, 255);
+
+    // 5) Deadband: rett frem når nesten midt
+    int16_t leftCmd, rightCmd;
+    if (abs(error) <= DEAD_BAND) {
+        leftCmd  = BASE_SPEED;
+        rightCmd = BASE_SPEED;
+    } else {
+        // differensiell styring: positiv error => linje til høyre => sving høyre
+        leftCmd  = clampi(BASE_SPEED - correction, 0, MAX_PWM);
+        rightCmd = clampi(BASE_SPEED + correction, 0, MAX_PWM);
     }
 
-    // Enkel følge-logikk basert på midtsensorene
-    if (binVals[2] == 1 && binVals[3] == 1 && binVals[1] == 0 && binVals[4] == 0) {
-        driver.move(base_speed, base_speed); // rett fram
-    }
-    else if (binVals[2] == 1 && binVals[3] == 0) {
-        driver.move(base_speed, base_speed - 30); // litt høyre
-    }
-    else if (binVals[2] == 0 && binVals[3] == 1) {
-        driver.move(base_speed - 30, base_speed); // litt venstre
-    }
-    else if ( (binVals[1] == 1 || binVals[0] == 1) && (binVals[4] == 0 && binVals[5] == 0) ) {
-        driver.move(base_speed - 50, base_speed + 50); // sterk venstre
-    }
-    else if ( (binVals[4] == 1 || binVals[5] == 1) && (binVals[0] == 0 && binVals[1] == 0) ) {
-        driver.move(base_speed + 50, base_speed - 50); // sterk høyre
-    }
-    else {
-        // Linje mistet: stopp kort, rygg litt, og prøv igjen
-        driver.move(0, 0);
-        delay(80);
-        driver.move(-80, -80);
-        delay(120);
+    // 6) Håndter tapt linje: brems litt og sving mot "sist kjente side"
+    if (maxVal < 80) { // terskel 0..1000 (justér ved behov)
+        int8_t dir = (lastError >= 0) ? 1 : -1; // husk hvilken side den sist var på
+        leftCmd  = clampi(BASE_SPEED - dir * 120, 0, MAX_PWM);
+        rightCmd = clampi(BASE_SPEED + dir * 120, 0, MAX_PWM);
     }
 
-    // Debug-utskrift
-    for (uint8_t i = 0; i < sensor_count; i++) {
-        Serial.print(sensor_values[i]); Serial.print('\t');
-    }
-    Serial.print("pos="); Serial.println(position);
+    driver.move(leftCmd, rightCmd);
 
-    delay(30);
+    // 7) Oppdater PD-tilstand
+    lastError = error;
+    lastMs = now;
+
+    // 8) (valgfritt) debug til Serial Plotter
+    // Serial.print(error); Serial.print('\t');
+    // Serial.print((int)pos); Serial.print('\t');
+    // Serial.print((int)leftCmd); Serial.print('\t');
+    // Serial.println((int)rightCmd);
+
+    delay(10);
 }
