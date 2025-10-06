@@ -68,13 +68,13 @@ public:
 // --- Konstanter og oppsett ---
 const uint8_t SENSOR_COUNT = 6;
 const int16_t CENTER       = 2500;   // QTR readLineBlack: 0..5000
-const int16_t BASE_SPEED   = 180;    // 0..255 (start lavt, øk når det funker)
+const int16_t BASE_SPEED   = 200;    // 0..255 (start lavt, øk når det funker)
 const int16_t DEAD_BAND    = 400;    // rett frem når |error| <= dette
 const int16_t MAX_PWM      = 255;
 
 // PD-tuning (start her; finjustér på banen)
-const float KP = 0.12f;   // proporsjonal
-const float KD = 0.75f;   // derivasjon (stabiliserer sving)
+const float KP = 0.18f;   // proporsjonal
+const float KD = 0.60f;   // derivasjon (stabiliserer sving)
 
 uint16_t sensor_values[SENSOR_COUNT];
 
