@@ -76,6 +76,10 @@ const int16_t MAX_PWM      = 255;
 const float KP = 0.18f;   // proporsjonal
 const float KD = 0.60f;   // derivasjon (stabiliserer sving)
 
+// --- Linje tapt-innstillinger ---
+const uint16_t LOST_THRESH = 100;     // terskel 0..1000 for "tapt linje" (juster ved behov)
+const int16_t  SPIN_PWM    = 255;    // hastighet for piruett (0..255)
+
 uint16_t sensor_values[SENSOR_COUNT];
 
 // TB6612FNG til Arduino-pins (som du hadde)
@@ -168,14 +172,25 @@ void loop() {
         rightCmd = clampi(BASE_SPEED + correction, 0, MAX_PWM);
     }
 
-    // 6) Håndter tapt linje: brems litt og sving mot "sist kjente side"
-    if (maxVal < 80) { // terskel 0..1000 (justér ved behov)
-        int8_t dir = (lastError >= 0) ? 1 : -1; // husk hvilken side den sist var på
-        leftCmd  = clampi(BASE_SPEED - dir * 120, 0, MAX_PWM);
-        rightCmd = clampi(BASE_SPEED + dir * 120, 0, MAX_PWM);
-    }
+    // Etter at du har beregnet leftCmd/rightCmd som vanlig:
+    bool lost = (maxVal < LOST_THRESH);
 
+    if (lost) {
+        // spin kontinuerlig mot sist kjente side (error<0 => høyre)
+        int8_t dir = (lastError < 0) ? 1 : -1;  // +1 = sving høyre, -1 = venstre
+        if (dir > 0) {
+            // høyresving: høyre = inner (bakover), venstre = ytter (frem)
+            leftCmd  = +SPIN_PWM;
+            rightCmd = -SPIN_PWM;
+        } else {
+            // venstresving: venstre = inner (bakover), høyre = ytter (frem)
+            leftCmd  = -SPIN_PWM;
+            rightCmd = +SPIN_PWM;
+        }
+    }
+    // ellers (ikke lost): leftCmd/rightCmd er allerede satt av PD-delen
     driver.move(leftCmd, rightCmd);
+
 
     // 7) Oppdater PD-tilstand
     lastError = error;
