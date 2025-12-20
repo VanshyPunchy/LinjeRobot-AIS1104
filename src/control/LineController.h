@@ -1,0 +1,10 @@
+//
+// Created by veerv on 20/12/2025.
+//
+
+#ifndef LINJEROBOT_AIS1104_LINECONTROLLER_H
+#define LINJEROBOT_AIS1104_LINECONTROLLER_H
+
+class LineController {};
+
+#endif // LINJEROBOT_AIS1104_LINECONTROLLER_H
