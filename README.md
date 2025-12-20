@@ -6,5 +6,6 @@ change build flags
 
 You need to run:
 ```bash
+$ git checkout "Fase-2"
 $ pio run -e nano_esp32 -t compiledb
 ```
