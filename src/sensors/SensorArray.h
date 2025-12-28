@@ -1,10 +1,17 @@
-//
-// Created by veerv on 20/12/2025.
-//
-
 #ifndef LINJEROBOT_AIS1104_ARRAY_H
 #define LINJEROBOT_AIS1104_ARRAY_H
 
-class SensorArray {};
+#pragma once
+
+#include "config/pins.h"
+
+class SensorArray {
+  public:
+  void begin();
+
+  void calibration();
+
+  void loop();
+};
 
 #endif // LINJEROBOT_AIS1104_ARRAY_H
