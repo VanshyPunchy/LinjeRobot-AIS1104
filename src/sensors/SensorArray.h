@@ -8,9 +8,7 @@
 class SensorArray {
   public:
   void begin();
-
   void calibration();
-
   void loop();
 };
 
