@@ -1,5 +1,9 @@
-//
-// Created by veerv on 20/12/2025.
-//
-
 #include "PID.h"
+
+#include "config/RobotConfig.h"
+
+void PID::setGain(float kp, float ki, float kd) {
+  kp_ = kp;
+  ki_ = ki;
+  kd_ = kd;
+}

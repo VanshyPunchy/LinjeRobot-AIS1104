@@ -3,26 +3,36 @@
 
 #pragma once
 
-#include "config/RobotConfig.h"
-
-class PID {
+class PID
+{
   public:
-  struct Limits {
-    float minOut = -1.0f;
-    float maxOut = 1.0f;
-  };
-
-  PID(
-    float kp = RobotConfig::kp,
-    float ki = RobotConfig::ki,
-    float kd = RobotConfig::kd
+  PID
+  (
+    float kp,
+    float ki,
+    float kd
   );
 
-  void setGains(float kp, float ki, float kd);
-  void setOutputLim(float minOut, maxOut);
-  void setIntegralLim(float minI, float maxI);
+  void update
+  (
+    float setpoint,
+    float measurement,
+    float dt
+    );
 
-  void reset(float integral = RobotConfig::integral);
+  void setGain
+  (
+    float kp,
+    float ki,
+    float kd
+    );
+
+  void reset();
+
+private:
+  float kp_, ki_, kd_;
+  float integral_{0.0f};
+  float prevError_{0.0f};
 };
 
 #endif // LINJEROBOT_AIS1104_PID_H
