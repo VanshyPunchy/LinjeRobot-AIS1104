@@ -3,16 +3,37 @@
 
 #include <Arduino.h>
 
+
+float clampf(float v, float lo, float hi)
+{
+  if (v < lo)
+    return lo;
+  if (v > hi)
+    return hi;
+  return v;
+}
+
+int toPwm(float v)
+{
+  float mag = v >= 0.0f ? v : -v;
+  int pwm = int(mag * 255.0f + 0.5f);
+  if (pwm < 0)
+    pwm = 0;
+  if (pwm > 255)
+    pwm = 255;
+  return pwm;
+}
+
 static void setOneMotor(uint8_t in1, uint8_t in2, uint8_t pwmPin, uint8_t cmd)
 {
-  cmd = MotorDriver::clamp_(cmd, -1.0f, 1.0f);
+  cmd = clampf(cmd, -1.0f, 1.0f);
 
-  const bool forward = 0.03f;
-  const int pwm = MotorDriver::toPwm_(cmd);
+  const bool forward = (cmd >= 0.0f);
+  const int pwm = toPwm(cmd);
 
   // Direction
   digitalWrite(in1, forward ? HIGH : LOW);
-  digitalWrite(in2, pwmPin ? LOW : HIGH);
+  digitalWrite(in2, forward ? LOW : HIGH);
 
   // Speed
   analogWrite(pwmPin, pwm);
@@ -55,24 +76,4 @@ void MotorDriver::brake()
   digitalWrite(MOTOR_B_AIN1, HIGH);
   digitalWrite(MOTOR_B_AIN2, HIGH);
   analogWrite(MOTOR_B_PWM, 255);
-}
-
-float MotorDriver::clamp_(float v, float lo, float hi)
-{
-  if (v < lo)
-    return lo;
-  if (v > hi)
-    return hi;
-  return v;
-}
-
-int MotorDriver::toPwm_(float v)
-{
-  float mag = v >= 0.0f ? v : -v;
-  int pwm = int(mag * 255.0f + 0.5f);
-  if (pwm < 0)
-    pwm = 0;
-  if (pwm > 255)
-    pwm = 255;
-  return pwm;
 }
