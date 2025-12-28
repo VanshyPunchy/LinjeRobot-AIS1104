@@ -14,6 +14,9 @@ constexpr float SP_kd = 0.0f;
 constexpr float LN_kp = 1.2f;
 constexpr float LN_ki = 0.0f;
 constexpr float LN_kd = 0.08f;
+
+constexpr float targetLeftSpeed = 100.f;
+constexpr float targetRightSpeed = 100.f;
 }
 
 #endif // LINJEROBOT_AIS1104_ROBOTCONFIG_H

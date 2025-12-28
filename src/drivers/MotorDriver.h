@@ -1,10 +1,22 @@
-//
-// Created by veerv on 20/12/2025.
-//
-
 #ifndef LINJEROBOT_AIS1104_MOTORDRIVER_H
 #define LINJEROBOT_AIS1104_MOTORDRIVER_H
 
-class MotorDriver {};
+#pragma once
+
+class MotorDriver {
+public:
+  void begin();
+
+  void set(
+    float left,
+    float right
+    );
+
+  void brake();
+
+private:
+  static float clamp_(float v, float lo, float hi);
+  static int toPwm_(float v);
+};
 
 #endif // LINJEROBOT_AIS1104_MOTORDRIVER_H

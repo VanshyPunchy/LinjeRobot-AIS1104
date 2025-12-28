@@ -13,7 +13,7 @@ class PID
     float kd
   );
 
-  void update
+  float update
   (
     float setpoint,
     float measurement,
