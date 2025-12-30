@@ -77,3 +77,7 @@ void MotorDriver::brake()
   digitalWrite(MOTOR_B_AIN2, HIGH);
   analogWrite(MOTOR_B_PWM, 255);
 }
+
+void MotorDriver::stop() {
+  set(0.0f, 0.0f);
+}

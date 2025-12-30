@@ -13,6 +13,7 @@ public:
     );
 
   void brake();
+  void stop();
 
 private:
   static float clamp_(float v, float lo, float hi);

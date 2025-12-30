@@ -8,8 +8,8 @@
 class SensorArray {
   public:
   void begin();
-  void calibration();
-  void loop();
+  void calibrateStep();
+  float readError();
 };
 
 #endif // LINJEROBOT_AIS1104_ARRAY_H

@@ -17,6 +17,11 @@ constexpr float LN_kd = 0.08f;
 
 constexpr float targetLeftSpeed = 100.f;
 constexpr float targetRightSpeed = 100.f;
+
+// Calibration
+constexpr float WigglePWR = 0.25f; // How hard to turn
+constexpr uint32_t FlipMS = 200; // Change direction every 200 ms
+constexpr uint32_t CalTime = 8000; // Calibrate for 8 seconds
 }
 
 #endif // LINJEROBOT_AIS1104_ROBOTCONFIG_H
