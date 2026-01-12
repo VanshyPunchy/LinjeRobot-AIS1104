@@ -42,7 +42,7 @@ void SensorArray::begin() {
   // configure the sensors
   qtr.setTypeAnalog();
   qtr.setSensorPins(qtrPINS, SensorCount);
-  qtr.setEmitterPin(LEDON);
+  // qtr.setEmitterPin(LEDON);
 }
 
 void SensorArray::calibrateStep() {
