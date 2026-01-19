@@ -1,8 +1,9 @@
-#include "../lib/Encoder/Encoder.h"
-#include "../lib/PID/PID.h"
-#include "config/RobotConfig.h"
-#include "config/pins.h"
+#include "../Encoder/Encoder.h"
+#include "../PID/PID.h"
 #include "../drivers/MotorDriver.h"
+#include "../Config/pins.h"
+#include "../Config/RobotConfig.h"
+
 
 Encoder leftEncoder(ENC_L_A, ENC_L_B);
 Encoder rightEncoder(ENC_R_A, ENC_R_B);

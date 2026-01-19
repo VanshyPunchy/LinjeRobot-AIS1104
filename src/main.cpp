@@ -1,4 +1,4 @@
-#include "control/Controller.cpp"
+#include "../lib/control/Controller.cpp"
 
 void setup() {
   leftEncoder.begin();

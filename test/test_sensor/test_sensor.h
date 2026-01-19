@@ -1,7 +1,3 @@
-//
-// Created by veerv on 19/01/2026.
-//
-
 #ifndef LINJEROBOT_AIS1104_TEST_SENSOR_H
 #define LINJEROBOT_AIS1104_TEST_SENSOR_H
 

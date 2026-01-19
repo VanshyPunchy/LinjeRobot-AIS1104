@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "config/pins.h"
+#include "../Config/pins.h"
 
 class Encoder {
   public:

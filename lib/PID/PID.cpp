@@ -1,6 +1,6 @@
 #include "PID.h"
 
-#include "config/RobotConfig.h"
+#include "../Config/RobotConfig.h"
 
 float PID::update(float setpoint, float measurement, float dt)
 {

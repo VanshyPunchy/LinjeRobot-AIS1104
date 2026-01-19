@@ -1,5 +1,5 @@
 #include "MotorDriver.h"
-#include "config/pins.h"
+#include "../Config/pins.h"
 
 #include <Arduino.h>
 
